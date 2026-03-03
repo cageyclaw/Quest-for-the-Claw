@@ -140,6 +140,7 @@ else{curScr=cpScr;pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;invuln=60;roller
 function update(){
 if(botEnabled&&(gameState==='TITLE'||gameState==='GAMEOVER')){gameState='PLAYING';reset();}
 if(gameState!=='PLAYING')return;
+const prevScr=curScr;
 frame++;
 if(invuln>0)invuln--;
 if(shake>0)shake--;
@@ -177,6 +178,10 @@ if(jump&&pl.gnd){pl.vy=JUMP;pl.gnd=false;}
 pl.x+=pl.vx;pl.y+=pl.vy;
 if(pl.x<0){if(curScr>0){curScr--;pl.x=W-pl.w-5;}else{pl.x=0;pl.vx=0;}}
 if(pl.x>W-pl.w){if(curScr<SCRS.length-1){curScr++;score+=10;if(s.cp&&curScr-1>cpScr)cpScr=curScr-1;pl.x=5;}else{pl.x=W-pl.w;pl.vx=0;}}
+if(curScr!==prevScr){
+const ns=SCRS[curScr];
+if(!ns.roll||ns.water||ns.crocWater)rollers=[];
+}
 pl.gnd=false;
 for(let i=0;i<s.p.length;i++){
 const p=s.p[i];
