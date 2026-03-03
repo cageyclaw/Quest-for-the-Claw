@@ -13,7 +13,7 @@ canvas { border: 4px solid #4a3728; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
 <body>
 <div id="gameContainer">
 <canvas id="gameCanvas" width="800" height="450"></canvas>
-<div id="instructions">ARROWS: Move (A/D optional) | SPACE: Jump | UP/W: Grab Vine | DOWN/S: Drop | R: Restart | P: Pause | D: Debug</div>
+<div id="instructions">ARROWS: Move (A/D optional) | SPACE: Jump/Release Vine | R: Restart | P: Pause | D: Debug</div>
 </div>
 <script>
 const canvas=document.getElementById('gameCanvas'),ctx=canvas.getContext('2d');
@@ -55,8 +55,8 @@ if(hints.vine){
 if(pl.x<hints.vine.grabX){
 botInput.ArrowRight=right;
 }
-if(pl.x>=hints.vine.grabX-8&&pl.x<=hints.vine.grabX+12){
-botInput.ArrowUp=true;
+if(pl.x>=hints.vine.grabX-8&&pl.x<=hints.vine.grabX+12&&pl.gnd){
+botInput.Space=true;
 }
 if(pl.x>=hints.vine.grabX){
 botInput.ArrowRight=right;
@@ -122,6 +122,10 @@ if(v.base==null)v.base=v.a||0;
 if(v.amp==null)v.amp=0.7;
 if(v.freq==null)v.freq=0.018+rand()*0.008;
 if(v.phase==null)v.phase=rand()*Math.PI*2;
+if(v.lBase==null)v.lBase=v.l;
+v.l=v.lBase+40;
+if(v.angle==null)v.angle=v.base;
+if(v.angVel==null)v.angVel=0;
 });
 if(s.crocs)s.crocs.forEach(c=>{if(c.period==null)c.period=180;});
 });
@@ -146,7 +150,10 @@ if(invuln>0)invuln--;
 if(shake>0)shake--;
 const s=SCRS[curScr];
 for(const v of s.v||[]){
-v.a=v.base+Math.sin(frame*v.freq+v.phase)*v.amp;
+const theta=v.base+Math.sin(frame*v.freq+v.phase)*v.amp;
+v.angle=theta;
+v.angVel=v.amp*v.freq*Math.cos(frame*v.freq+v.phase);
+v.a=theta;
 }
 if(botEnabled)runBot();
 const left=inputDown('ArrowLeft')||inputDown('KeyA');
@@ -159,16 +166,17 @@ rollers.forEach(r=>{r.x+=r.vx;if(Math.hypot(pl.x+pl.w/2-r.x,pl.y+pl.h/2-r.y)<r.r
 rollers=rollers.filter(r=>r.x>-60);
 if(pl.vine!==null){
 const v=s.v[pl.vine];
-const swing=left?-0.03:right?0.03:0;
-const drive=(v.a-pl.va)*0.02;
-pl.vv+=drive+swing+Math.sin(pl.va)*0.01;
-pl.vv*=0.99;pl.va+=pl.vv;
-pl.va=Math.max(-1.2,Math.min(1.2,pl.va));
-pl.x=v.x+Math.sin(pl.va)*v.l-pl.w/2;
-pl.y=v.y+Math.cos(pl.va)*v.l;
-pl.vx=0;pl.vy=0;
-if(jump){pl.vine=null;pl.vy=JUMP;pl.vx=Math.sin(pl.va)*10;}
-if(down)pl.vine=null;
+const ang=v.angle;
+pl.x=v.x+Math.sin(ang)*v.l-pl.w/2;
+pl.y=v.y+Math.cos(ang)*v.l;
+pl.vx=0;pl.vy=0;pl.gnd=false;
+if(jump){
+const tvx=Math.cos(ang)*v.l*v.angVel;
+const tvy=-Math.sin(ang)*v.l*v.angVel;
+pl.vine=null;
+pl.vx=tvx;
+pl.vy=tvy+JUMP;
+}
 return;
 }
 if(left){pl.vx-=ACCEL;pl.face=-1;}
@@ -187,10 +195,19 @@ for(let i=0;i<s.p.length;i++){
 const p=s.p[i];
 if(pl.x+pl.w>p.x&&pl.x<p.x+p.w&&pl.y+pl.h>p.y&&pl.y+pl.h<p.y+p.h+20&&pl.vy>=0){pl.y=p.y-pl.h;pl.vy=0;pl.gnd=true;}
 }
-if(up){
+if(pl.vine===null&&!pl.gnd){
 for(let i=0;i<s.v.length;i++){
 const v=s.v[i];
-if(Math.hypot(pl.x+pl.w/2-(v.x+Math.sin(v.a)*v.l),pl.y-(v.y+Math.cos(v.a)*v.l))<40){pl.vine=i;pl.va=v.a;pl.vv=0;break;}
+const vx=v.x+Math.sin(v.angle)*v.l;
+const vy=v.y+Math.cos(v.angle)*v.l;
+if(Math.hypot(pl.x+pl.w/2-vx,pl.y+pl.h/2-vy)<30){
+pl.vine=i;
+pl.x=vx-pl.w/2;
+pl.y=vy;
+pl.vx=0;pl.vy=0;
+pl.gnd=false;
+break;
+}
 }
 }
 if(pl.y>H)hurt();
