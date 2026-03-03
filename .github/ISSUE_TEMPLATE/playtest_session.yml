@@ -1,0 +1,33 @@
+name: "🎮 Playtest session report"
+description: "Higher-level feedback after a full play session"
+title: "[Playtest]: "
+labels: ["playtest", "feedback"]
+body:
+  - type: textarea
+    id: overall
+    attributes:
+      label: Overall notes
+      placeholder: "What felt good/bad? Where did you get stuck?"
+    validations:
+      required: true
+  - type: textarea
+    id: difficulty
+    attributes:
+      label: Difficulty / pacing
+      placeholder: "Too hard? Too easy?"
+    validations:
+      required: false
+  - type: textarea
+    id: controls
+    attributes:
+      label: Controls / feel
+      placeholder: "Jump height? movement? friction?"
+    validations:
+      required: false
+  - type: textarea
+    id: favorites
+    attributes:
+      label: Favorite screen / least favorite screen
+      placeholder: "e.g. Loved screen 7 vine swing; hated screen 2 jump"
+    validations:
+      required: false

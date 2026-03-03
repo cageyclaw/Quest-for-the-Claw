@@ -1,0 +1,66 @@
+name: "🐛 Bug report"
+description: "Report a bug found while playtesting Quest for the Claw"
+title: "[Bug]: "
+labels: ["bug", "playtest"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for playtesting **Quest for the Claw**!
+
+        Please include as much detail as you can so we can reproduce + fix fast.
+  - type: input
+    id: screen
+    attributes:
+      label: Screen / Area
+      description: "Which screen number (1–12) or where in the level?"
+      placeholder: "e.g. Screen 2"
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: "What did you do?"
+      placeholder: |
+        1. Start game
+        2. Move right to screen 2
+        3. Attempt jump to platform
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Blocker (can’t progress)
+        - Major (kills run / ruins game)
+        - Minor (annoying)
+        - Cosmetic
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / device
+      placeholder: "Chrome 122 on Windows / iPhone Safari / etc"
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Extra notes / screenshots
+      description: "Paste screenshots or anything helpful."
+      placeholder: "(optional)"
