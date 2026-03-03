@@ -110,19 +110,22 @@ if(window.__QFTC_BOT__||botQuery)botEnabled=true;
 
 if(botEnabled){gameState='PLAYING';reset();}
 
-document.addEventListener('keydown',e=>{
-  // Keep focus on the canvas for consistent input.
+const onKeyDown = (e)=>{
   canvas.focus();
   keys[e.code]=true;
   if(e.code==='KeyR')reset();
   if(e.code==='KeyP')gameState=gameState==='PLAYING'?'PAUSED':(gameState==='PAUSED'?'PLAYING':gameState);
   if(e.code==='KeyD')debug=!debug;
 
-  // Start/retry with SPACE (or Enter as a fallback).
-  if(gameState==='TITLE'&&(e.code==='Space'||e.code==='Enter')){gameState='PLAYING';reset();}
-  if(gameState==='GAMEOVER'&&(e.code==='Space'||e.code==='Enter')){gameState='PLAYING';reset();}
-  if(gameState==='VICTORY'&&(e.code==='Space'||e.code==='Enter')){gameState='TITLE';}
-});
+  const isStart = (e.code==='Space'||e.code==='Enter'||e.key===' '||e.key==='Enter'||e.keyCode===32||e.keyCode===13);
+  if(isStart){ e.preventDefault(); }
+
+  if(gameState==='TITLE'&&isStart){gameState='PLAYING';reset();}
+  if(gameState==='GAMEOVER'&&isStart){gameState='PLAYING';reset();}
+  if(gameState==='VICTORY'&&isStart){gameState='TITLE';}
+};
+window.addEventListener('keydown',onKeyDown,true);
+document.addEventListener('keydown',onKeyDown);
 document.addEventListener('keyup',e=>keys[e.code]=false);
 
 function reset(){
