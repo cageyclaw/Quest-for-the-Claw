@@ -13,7 +13,7 @@ canvas { border: 4px solid #4a3728; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
 <body>
 <div id="gameContainer">
 <canvas id="gameCanvas" width="800" height="450"></canvas>
-<div id="instructions">ARROWS/A+D: Move | SPACE: Jump | UP/W: Grab Vine | DOWN/S: Drop | R: Restart | P: Pause | D: Debug</div>
+<div id="instructions">ARROWS: Move (A/D optional) | SPACE: Jump | UP/W: Grab Vine | DOWN/S: Drop | R: Restart | P: Pause | D: Debug</div>
 </div>
 <script>
 const canvas=document.getElementById('gameCanvas'),ctx=canvas.getContext('2d');
@@ -114,7 +114,15 @@ document.addEventListener('keyup',e=>keys[e.code]=false);
 
 function reset(){
 lives=3;score=0;curScr=0;cpScr=0;
-SCRS.forEach(s=>{if(s.c)s.c.forEach(c=>c.f=0);});
+SCRS.forEach(s=>{
+if(s.c)s.c.forEach(c=>c.f=0);
+if(s.v)s.v.forEach(v=>{
+if(v.base==null)v.base=v.a||0;
+if(v.amp==null)v.amp=0.6;
+if(v.freq==null)v.freq=0.015+rand()*0.01;
+if(v.phase==null)v.phase=rand()*Math.PI*2;
+});
+});
 pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;invuln=60;
 boulders=[];darts=[];parts=[];logs=[];
 resetBotMemory();
@@ -134,6 +142,9 @@ frame++;
 if(invuln>0)invuln--;
 if(shake>0)shake--;
 const s=SCRS[curScr];
+for(const v of s.v||[]){
+v.a=v.base+Math.sin(frame*v.freq+v.phase)*v.amp;
+}
 if(botEnabled)runBot();
 const left=inputDown('ArrowLeft')||inputDown('KeyA');
 const right=inputDown('ArrowRight')||inputDown('KeyD');
@@ -152,7 +163,8 @@ darts=darts.filter(d=>d.x<W);
 if(pl.vine!==null){
 const v=s.v[pl.vine];
 const swing=left?-0.03:right?0.03:0;
-pl.vv+=swing+Math.sin(pl.va)*0.01;
+const drive=(v.a-pl.va)*0.02;
+pl.vv+=drive+swing+Math.sin(pl.va)*0.01;
 pl.vv*=0.99;pl.va+=pl.vv;
 pl.va=Math.max(-1.2,Math.min(1.2,pl.va));
 pl.x=v.x+Math.sin(pl.va)*v.l-pl.w/2;
