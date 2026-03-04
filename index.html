@@ -20,10 +20,17 @@ const canvas=document.getElementById('gameCanvas'),ctx=canvas.getContext('2d');
 // Ensure the canvas can receive keyboard focus so SPACE/ARROWS work reliably.
 canvas.tabIndex = 0;
 canvas.focus();
+const startGame = () => { if (gameState === 'TITLE') { gameState = 'PLAYING'; reset(); } };
+
 canvas.addEventListener('pointerdown', () => {
   canvas.focus();
-  // Click/tap to start (helps when the page doesn't have keyboard focus).
-  if (gameState === 'TITLE') { gameState = 'PLAYING'; reset(); }
+  startGame();
+});
+
+// Also allow clicking anywhere on the page to focus + start.
+window.addEventListener('pointerdown', () => {
+  canvas.focus();
+  startGame();
 });
 const W=800,H=450,G=400,GRAV=0.6,JUMP=-12,ACCEL=0.8,FRICT=0.8;
 let gameState='TITLE',debug=false,curScr=0,lives=3,score=0,cpScr=0,invuln=0,shake=0,frame=0;
@@ -120,7 +127,7 @@ const onKeyDown = (e)=>{
   const isStart = (e.code==='Space'||e.code==='Enter'||e.key===' '||e.key==='Enter'||e.keyCode===32||e.keyCode===13);
   if(isStart){ e.preventDefault(); }
 
-  if(gameState==='TITLE'&&isStart){gameState='PLAYING';reset();}
+  if(gameState==='TITLE'&&isStart){ startGame(); }
   if(gameState==='GAMEOVER'&&isStart){gameState='PLAYING';reset();}
   if(gameState==='VICTORY'&&isStart){gameState='TITLE';}
 };
@@ -385,7 +392,7 @@ ctx.fillStyle='#fff';ctx.font='20px monospace';
 ctx.fillText('Navigate the jungle ruins and collect',200,200);
 ctx.fillText('the legendary golden claw!',250,230);
 ctx.fillStyle='#0f0';ctx.font='24px monospace';
-ctx.fillText('Press SPACE to Start',280,320);
+ctx.fillText('Press SPACE (or click) to Start',220,320);
 }
 if(gameState==='PAUSED'){
 ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
