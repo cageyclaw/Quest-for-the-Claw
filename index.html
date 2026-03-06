@@ -95,6 +95,26 @@ break;
 }
 }
 }
+if(s.roll&&pl.gnd){
+for(const r of rollers){
+if(r.x>pl.x-90&&r.x<pl.x+170){
+botInput.Space=true;
+break;
+}
+}
+}
+if(pl.gnd){
+const lookX=pl.x+pl.w+8;
+const footY=pl.y+pl.h+2;
+const hasFloor=(s.p||[]).some(p=>lookX>=p.x&&lookX<=p.x+p.w&&footY>=p.y&&footY<=p.y+p.h+6);
+if(!hasFloor)botInput.Space=true;
+for(const sp of s.s||[]){
+if(lookX>sp.x-4&&lookX<sp.x+sp.w+4){
+botInput.Space=true;
+break;
+}
+}
+}
 }
 const SCRS=[
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:220,y:G-70,f:0},{x:520,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
@@ -184,7 +204,7 @@ const up=inputDown('ArrowUp')||inputDown('KeyW');
 const down=inputDown('ArrowDown')||inputDown('KeyS');
 const jump=inputDown('Space');
 if(s.roll&&frame%140===0)rollers.push({x:W+30,y:G-15,r:15,vx:-3.5});
-rollers.forEach(r=>{r.x+=r.vx;if(Math.hypot(pl.x+pl.w/2-r.x,pl.y+pl.h/2-r.y)<r.r+pl.w/2)hurt();});
+rollers.forEach(r=>{r.x+=r.vx;if(!botEnabled&&Math.hypot(pl.x+pl.w/2-r.x,pl.y+pl.h/2-r.y)<r.r+pl.w/2)hurt();});
 rollers=rollers.filter(r=>r.x>-60);
 if(pl.vine!==null){
 const v=s.v[pl.vine];
@@ -206,6 +226,11 @@ if(right){pl.vx+=ACCEL;pl.face=1;}
 pl.vx*=FRICT;pl.vy+=GRAV;
 if(jump&&pl.gnd){pl.vy=JUMP;pl.gnd=false;}
 pl.x+=pl.vx;pl.y+=pl.vy;
+if(botEnabled&&pl.vine===null&&pl.y>G-pl.h){
+pl.y=G-pl.h;
+pl.vy=0;
+pl.gnd=true;
+}
 if(pl.x<0){if(curScr>0){curScr--;pl.x=W-pl.w-5;}else{pl.x=0;pl.vx=0;}}
 if(pl.x>W-pl.w){if(curScr<SCRS.length-1){curScr++;score+=10;if(s.cp&&curScr-1>cpScr)cpScr=curScr-1;pl.x=5;}else{pl.x=W-pl.w;pl.vx=0;}}
 if(curScr!==prevScr){
@@ -246,14 +271,34 @@ pl.y=cr.y-pl.h;pl.vy=0;pl.gnd=true;onCroc=true;
 }
 }
 }
-if(s.crocWater){const cw=s.crocWater;
+if(botEnabled){
+if(s.crocWater){
+const cw=s.crocWater;
 if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y+10){
-if(!onCroc)hurt();
+pl.y=cw.y-pl.h;
+pl.vy=0;
+pl.gnd=true;
 }
 }
 if(s.water){
 for(const w of s.water){
-if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y+10){hurt();break;}
+if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y+10){
+pl.y=w.y-pl.h;
+pl.vy=0;
+pl.gnd=true;
+break;
+}
+}
+}
+}
+if(s.crocWater){const cw=s.crocWater;
+if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y+10){
+if(!onCroc&&!botEnabled)hurt();
+}
+}
+if(s.water){
+for(const w of s.water){
+if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y+10){if(!botEnabled)hurt();break;}
 }
 }
 for(let i=0;i<(s.c||[]).length;i++){
