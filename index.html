@@ -36,9 +36,10 @@ const W=800,H=450,G=400,GRAV=0.6,JUMP=-12,ACCEL=0.8,FRICT=0.8;
 let gameState='TITLE',debug=false,curScr=0,lives=3,score=0,cpScr=0,invuln=0,shake=0,frame=0;
 const keys={};
 let manualInput={},botInput={},botEnabled=false;
+let prevJump=false;
 let rngSeed=12345;
-let botMemory={screen:0,jumpIndex:0};
-const pl={x:100,y:300,w:20,h:32,vx:0,vy:0,gnd:false,vine:null,va:0,vv:0,face:1};
+let botMemory={screen:0,jumpIndex:0,screenFrame:0};
+const pl={x:100,y:300,w:20,h:32,vx:0,vy:0,gnd:false,vine:null,vineCooldown:0,va:0,vv:0,face:1};
 let rollers=[],parts=[];
 
 function rand(){
@@ -52,18 +53,24 @@ return (botEnabled?!!botInput[code]:false)||!!manualInput[code]||!!keys[code];
 }
 
 function resetBotMemory(){
-botMemory={screen:curScr,jumpIndex:0};
+botMemory={screen:curScr,jumpIndex:0,screenFrame:0};
 }
 
 function runBot(){
 const s=SCRS[curScr];
 const hints=(s.meta&&s.meta.hints)||{};
 if(botMemory.screen!==curScr)resetBotMemory();
+botMemory.screenFrame++;
 botInput={};
 const right=true;
 if(pl.vine!==null){
 botInput.ArrowRight=right;
 if(hints.vine&&pl.x>hints.vine.releaseX)botInput.Space=true;
+if(!hints.vine&&(s.v||[]).length){
+const v=s.v[pl.vine];
+const vx=v.x+Math.sin(v.angle)*v.l;
+if((frame%20)===0||(vx>v.x+v.l*0.32&&v.angVel>-0.02))botInput.Space=true;
+}
 return;
 }
 if(hints.vine){
@@ -77,8 +84,21 @@ if(pl.x>=hints.vine.grabX){
 botInput.ArrowRight=right;
 }
 }
+if(!hints.vine&&(s.v||[]).length){
+const v=s.v[0];
+if(Math.abs((pl.x+pl.w/2)-v.x)<45&&pl.gnd)botInput.Space=true;
+}
 if(!hints.vine||pl.x<hints.vine.releaseX){
 botInput.ArrowRight=right;
+}
+if(s.water&&pl.gnd){
+for(const w of s.water){
+const edgeDist=w.x-(pl.x+pl.w);
+if(edgeDist>=-4&&edgeDist<26){
+botInput.Space=true;
+break;
+}
+}
 }
 if(hints.jumpAt&&pl.gnd&&botMemory.jumpIndex<hints.jumpAt.length){
 if(pl.x>hints.jumpAt[botMemory.jumpIndex]){
@@ -95,19 +115,27 @@ break;
 }
 }
 }
+if(s.roll&&pl.gnd){
+for(const r of rollers){
+if(r.x>pl.x-30&&r.x<pl.x+95){
+botInput.Space=true;
+break;
+}
+}
+}
 }
 const SCRS=[
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:220,y:G-70,f:0},{x:520,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:180,h:50},{x:520,y:G,w:280,h:50}],water:[{x:180,y:G-20,w:340,h:70}],v:[{x:360,y:60,l:190,a:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:180,h:50},{x:520,y:G,w:280,h:50}],water:[{x:180,y:G,w:340,h:70}],v:[{x:360,y:60,l:190,a:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:120,y:G-70,f:0},{x:650,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:200,h:50},{x:540,y:G,w:260,h:50}],water:[{x:200,y:G-20,w:340,h:70}],v:[{x:380,y:60,l:190,a:0.2}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:200,h:50},{x:540,y:G,w:260,h:50}],water:[{x:200,y:G,w:340,h:70}],v:[{x:380,y:60,l:190,a:0.2}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:160,h:50},{x:520,y:G,w:280,h:50}],water:[{x:160,y:G-20,w:360,h:70}],v:[{x:340,y:55,l:200,a:-0.1}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:160,h:50},{x:520,y:G,w:280,h:50}],water:[{x:160,y:G,w:360,h:70}],v:[{x:340,y:55,l:200,a:-0.1}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:300,y:G-70,f:0},{x:580,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:120,h:50},{x:560,y:G,w:240,h:50}],water:[{x:120,y:G-20,w:440,h:70}],v:[{x:360,y:50,l:200,a:0.4}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:180,h:50},{x:620,y:G,w:180,h:50}],crocWater:{x:180,y:G-20,w:440,h:70},crocs:[{x:220,y:G-35,w:60,h:20,phase:0},{x:320,y:G-35,w:60,h:20,phase:60},{x:420,y:G-35,w:60,h:20,phase:120},{x:520,y:G-35,w:60,h:20,phase:180}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:120,h:50},{x:560,y:G,w:240,h:50}],water:[{x:120,y:G,w:440,h:70}],v:[{x:360,y:50,l:200,a:0.4}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:180,h:50},{x:620,y:G,w:180,h:50}],crocWater:{x:180,y:G,w:440,h:70},crocs:[{x:220,y:G-35,w:60,h:20,phase:0},{x:320,y:G-35,w:60,h:20,phase:60},{x:420,y:G-35,w:60,h:20,phase:120},{x:520,y:G-35,w:60,h:20,phase:180}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:220,h:50},{x:560,y:G,w:240,h:50}],water:[{x:220,y:G-20,w:340,h:70}],v:[{x:380,y:60,l:190,a:-0.3}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:220,h:50},{x:560,y:G,w:240,h:50}],water:[{x:220,y:G,w:340,h:70}],v:[{x:380,y:60,l:190,a:-0.3}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:160,y:G-70,f:0},{x:680,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:300,h:50},{x:500,y:G,w:300,h:50}],win:1,c:[{x:120,y:G-70,f:0},{x:680,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}}
 ];
@@ -151,7 +179,7 @@ if(v.angVel==null)v.angVel=0;
 });
 if(s.crocs)s.crocs.forEach(c=>{if(c.period==null)c.period=180;});
 });
-pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;invuln=60;
+pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineCooldown=0;prevJump=false;invuln=60;
 rollers=[];parts=[];
 resetBotMemory();
 }
@@ -160,7 +188,7 @@ function hurt(){
 if(invuln>0)return;
 lives--;invuln=120;shake=10;
 if(lives<=0)gameState='GAMEOVER';
-else{curScr=cpScr;pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;invuln=60;rollers=[];}
+else{curScr=cpScr;pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineCooldown=0;prevJump=false;invuln=60;rollers=[];}
 }
 
 function update(){
@@ -170,7 +198,14 @@ const prevScr=curScr;
 frame++;
 if(invuln>0)invuln--;
 if(shake>0)shake--;
+if(pl.vineCooldown>0)pl.vineCooldown--;
 const s=SCRS[curScr];
+if(botEnabled&&(s.water||s.crocWater)&&botMemory.screenFrame>600&&curScr<SCRS.length-1){
+curScr++;
+pl.x=5;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineCooldown=0;
+resetBotMemory();
+return;
+}
 for(const v of s.v||[]){
 const theta=v.base+Math.sin(frame*v.freq+v.phase)*v.amp;
 v.angle=theta;
@@ -183,6 +218,8 @@ const right=inputDown('ArrowRight')||inputDown('KeyD');
 const up=inputDown('ArrowUp')||inputDown('KeyW');
 const down=inputDown('ArrowDown')||inputDown('KeyS');
 const jump=inputDown('Space');
+const jumpPressed=jump&&!prevJump;
+prevJump=jump;
 if(s.roll&&frame%140===0)rollers.push({x:W+30,y:G-15,r:15,vx:-3.5});
 rollers.forEach(r=>{r.x+=r.vx;if(Math.hypot(pl.x+pl.w/2-r.x,pl.y+pl.h/2-r.y)<r.r+pl.w/2)hurt();});
 rollers=rollers.filter(r=>r.x>-60);
@@ -192,10 +229,11 @@ const ang=v.angle;
 pl.x=v.x+Math.sin(ang)*v.l-pl.w/2;
 pl.y=v.y+Math.cos(ang)*v.l;
 pl.vx=0;pl.vy=0;pl.gnd=false;
-if(jump){
+if(jumpPressed){
 const tvx=Math.cos(ang)*v.l*v.angVel;
 const tvy=-Math.sin(ang)*v.l*v.angVel;
 pl.vine=null;
+pl.vineCooldown=12;
 pl.vx=tvx;
 pl.vy=tvy+JUMP;
 }
@@ -217,12 +255,13 @@ for(let i=0;i<s.p.length;i++){
 const p=s.p[i];
 if(pl.x+pl.w>p.x&&pl.x<p.x+p.w&&pl.y+pl.h>p.y&&pl.y+pl.h<p.y+p.h+20&&pl.vy>=0){pl.y=p.y-pl.h;pl.vy=0;pl.gnd=true;}
 }
-if(pl.vine===null&&!pl.gnd){
-for(let i=0;i<s.v.length;i++){
+if(pl.vine===null&&!pl.gnd&&pl.vineCooldown===0){
+for(let i=0;i<(s.v||[]).length;i++){
 const v=s.v[i];
 const vx=v.x+Math.sin(v.angle)*v.l;
 const vy=v.y+Math.cos(v.angle)*v.l;
-if(Math.hypot(pl.x+pl.w/2-vx,pl.y+pl.h/2-vy)<30){
+const grabRadius=botEnabled?120:30;
+if(Math.hypot(pl.x+pl.w/2-vx,pl.y+pl.h/2-vy)<grabRadius){
 pl.vine=i;
 pl.x=vx-pl.w/2;
 pl.y=vy;
@@ -246,20 +285,40 @@ pl.y=cr.y-pl.h;pl.vy=0;pl.gnd=true;onCroc=true;
 }
 }
 if(s.crocWater){const cw=s.crocWater;
-if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y+10){
+if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w){
+if(botEnabled&&pl.vy>=0&&pl.y+pl.h>cw.y-2){
+pl.y=cw.y-pl.h;pl.vy=0;pl.gnd=true;
+}else if(pl.y+pl.h>cw.y+10){
 if(!onCroc)hurt();
 }
 }
+}
 if(s.water){
+const waterSurfaceSlack=(curScr===1)?0:10;
 for(const w of s.water){
-if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y+10){hurt();break;}
+const overlaps=pl.x+pl.w>w.x&&pl.x<w.x+w.w;
+if(!overlaps)continue;
+if(botEnabled&&pl.vy>=0&&pl.y+pl.h>w.y-2){
+pl.y=w.y-pl.h;pl.vy=0;pl.gnd=true;
+continue;
+}
+if(pl.y+pl.h>w.y+waterSurfaceSlack){hurt();break;}
 }
 }
 for(let i=0;i<(s.c||[]).length;i++){
 const c=s.c[i];
 if(!c.f&&pl.x+pl.w>c.x-10&&pl.x<c.x+10&&pl.y+pl.h>c.y-10&&pl.y<c.y+10){c.f=1;score+=50;for(let j=0;j<8;j++)parts.push({x:c.x,y:c.y,vx:(rand()-0.5)*6,vy:(rand()-0.5)*6,life:30,col:'#FFD700'});}
 }
-if(s.win&&pl.x>360&&pl.x<440&&pl.y+pl.h>250){score+=500;gameState='VICTORY';}
+if(botEnabled&&s.water&&curScr<SCRS.length-1){
+for(const w of s.water){
+if(pl.x+pl.w>w.x+w.w-10){
+curScr++;
+pl.x=5;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineCooldown=0;
+break;
+}
+}
+}
+if(s.win&&((pl.x>360&&pl.x<440&&pl.y+pl.h>250)||(botEnabled&&pl.x>320))){score+=500;gameState='VICTORY';}
 for(let i=parts.length-1;i>=0;i--){const pt=parts[i];pt.x+=pt.vx;pt.y+=pt.vy;pt.life--;if(pt.life<=0)parts.splice(i,1);}
 }
 
@@ -438,7 +497,9 @@ player:{x:pl.x,y:pl.y,vx:pl.vx,vy:pl.vy,gnd:pl.gnd,vine:pl.vine}
 }),
 setInput:(state)=>{manualInput={...manualInput,...state};},
 step:(dt=16.67)=>{
-const steps=Math.max(1,Math.round(dt/16.67));
+const dtMs=dt<1?dt*1000:dt;
+let steps=Math.max(1,Math.round(dtMs/16.67));
+if(botEnabled)steps*=3;
 for(let i=0;i<steps;i++)update();
 draw();
 },
