@@ -35,6 +35,7 @@ window.addEventListener('pointerdown', () => {
 const W=800,H=450,G=400,GRAV=0.6,JUMP=-12,ACCEL=0.8,FRICT=0.8;
 let gameState='TITLE',debug=false,curScr=0,lives=3,score=0,cpScr=0,invuln=0,shake=0,frame=0;
 const keys={};
+let jumpRequest=false;
 let manualInput={},botInput={},botEnabled=false;
 let rngSeed=12345;
 let botMemory={screen:0,jumpIndex:0};
@@ -49,6 +50,21 @@ return rngSeed/4294967296;
 
 function inputDown(code){
 return (botEnabled?!!botInput[code]:false)||!!manualInput[code]||!!keys[code];
+}
+
+function consumeJumpRequest(){
+const pressed=jumpRequest;
+jumpRequest=false;
+return pressed;
+}
+
+function detachFromVine(v){
+const ang=v.angle;
+const tvx=Math.cos(ang)*v.l*v.angVel;
+const tvy=-Math.sin(ang)*v.l*v.angVel;
+pl.vine=null;
+pl.vx=tvx;
+pl.vy=tvy+JUMP;
 }
 
 function resetBotMemory(){
@@ -140,6 +156,7 @@ if(botEnabled){gameState='PLAYING';reset();}
 const onKeyDown = (e)=>{
   canvas.focus();
   keys[e.code]=true;
+  if(e.code==='Space'&&!e.repeat)jumpRequest=true;
   if(e.code==='KeyR')reset();
   if(e.code==='KeyP')gameState=gameState==='PLAYING'?'PAUSED':(gameState==='PAUSED'?'PLAYING':gameState);
   if(e.code==='KeyD')debug=!debug;
@@ -203,6 +220,7 @@ const right=inputDown('ArrowRight')||inputDown('KeyD');
 const up=inputDown('ArrowUp')||inputDown('KeyW');
 const down=inputDown('ArrowDown')||inputDown('KeyS');
 const jump=inputDown('Space');
+const jumpPressed=consumeJumpRequest();
 if(s.roll&&frame%140===0)rollers.push({x:W+30,y:G-15,r:15,vx:-3.5});
 rollers.forEach(r=>{r.x+=r.vx;if(!botEnabled&&Math.hypot(pl.x+pl.w/2-r.x,pl.y+pl.h/2-r.y)<r.r+pl.w/2)hurt();});
 rollers=rollers.filter(r=>r.x>-60);
@@ -212,12 +230,8 @@ const ang=v.angle;
 pl.x=v.x+Math.sin(ang)*v.l-pl.w/2;
 pl.y=v.y+Math.cos(ang)*v.l;
 pl.vx=0;pl.vy=0;pl.gnd=false;
-if(jump){
-const tvx=Math.cos(ang)*v.l*v.angVel;
-const tvy=-Math.sin(ang)*v.l*v.angVel;
-pl.vine=null;
-pl.vx=tvx;
-pl.vy=tvy+JUMP;
+if(jumpPressed||jump){
+detachFromVine(v);
 }
 return;
 }
@@ -513,7 +527,22 @@ draw();
 },
 enableBot:(on=true)=>{botEnabled=on;if(on){gameState='PLAYING';reset();}},
 setSeed:(seed)=>{rngSeed=seed>>>0;},
-getScreenMeta:()=>SCRS.map(s=>s.meta)
+getScreenMeta:()=>SCRS.map(s=>s.meta),
+attachToVineForTest:(screenIndex=1,vineIndex=0)=>{
+const screen=SCRS[screenIndex];
+if(!screen||!screen.v||!screen.v[vineIndex])return false;
+const v=screen.v[vineIndex];
+curScr=screenIndex;
+gameState='PLAYING';
+const ang=v.angle??v.a??0;
+const vx=v.x+Math.sin(ang)*v.l;
+const vy=v.y+Math.cos(ang)*v.l;
+pl.vine=vineIndex;
+pl.x=vx-pl.w/2;
+pl.y=vy;
+pl.vx=0;pl.vy=0;pl.gnd=false;
+return true;
+}
 };
 window.__qftc.tick=window.__qftc.step;
 
