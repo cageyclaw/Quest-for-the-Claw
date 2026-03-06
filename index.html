@@ -159,8 +159,8 @@ const onKeyDown = (e)=>{
   if(gameState==='GAMEOVER'&&isStart){gameState='PLAYING';reset();}
   if(gameState==='VICTORY'&&isStart){gameState='TITLE';}
 };
+// One global keyboard listener in capture phase avoids focus quirks without double-handling.
 window.addEventListener('keydown',onKeyDown,true);
-document.addEventListener('keydown',onKeyDown);
 document.addEventListener('keyup',e=>keys[e.code]=false);
 
 function syncOverlay(){
@@ -474,7 +474,7 @@ function loop(){
 
 window.__qftc={
 getState:()=>({
-score,lives,frame,gameState,
+score,lives,frame,gameState,debug,
 screenIndex:curScr,
 victory:gameState==='VICTORY',
 gameOver:gameState==='GAMEOVER',
