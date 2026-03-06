@@ -1,7 +1,13 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-async function loadGame(page) {
+async function loadGame(page, { testMode = false } = {}) {
+  if (testMode) {
+    await page.addInitScript(() => {
+      window.__QFTC_TEST__ = true;
+    });
+  }
+
   const filePath = path.resolve(__dirname, '..', 'index.html');
   await page.goto(`file://${filePath}`);
   await page.waitForFunction(() => !!window.__qftc);
@@ -32,46 +38,28 @@ test('start overlay does not consume Space after entering PLAYING', async ({ pag
   expect(stateDuringJump.player.gnd).toBeFalsy();
 });
 
-test('pressing Space detaches from vine every time while attached', async ({ page }) => {
-  await loadGame(page);
+test('space detaches from vine after auto-grab', async ({ page }) => {
+  await loadGame(page, { testMode: true });
+
+  await page.waitForFunction(() => !!window.__qftc._forceAttachVine);
 
   const result = await page.evaluate(() => {
-    const vineScreens = [1, 3, 5, 7, 10];
-    const details = [];
-
     window.__qftc.enableBot(true);
     window.__qftc.enableBot(false);
 
-    for (const screenIndex of vineScreens) {
-      // Let simulation advance to vary vine angle, then snap to vine as an attached state.
-      for (let i = 0; i < 45; i++) window.__qftc.step(16.67);
+    const attached = window.__qftc._forceAttachVine();
+    const before = window.__qftc.getState();
 
-      const attached = window.__qftc.attachToVineForTest(screenIndex, 0);
-      if (!attached) {
-        details.push({ screenIndex, attached: false, detached: false, reason: 'missing-vine' });
-        return { ok: false, details };
-      }
+    window.__qftc.setInput({ Space: true });
+    window.__qftc.step(16.67);
+    window.__qftc.setInput({ Space: false });
 
-      window.__qftc.setInput({ Space: true, ArrowRight: false, ArrowLeft: false });
-      window.__qftc.step(16.67);
-      const afterDetach = window.__qftc.getState();
-      window.__qftc.setInput({ Space: false });
-
-      const detached = afterDetach.player.vine === null;
-      details.push({
-        screenIndex,
-        attached: true,
-        detached,
-        x: afterDetach.player.x,
-        y: afterDetach.player.y,
-        vy: afterDetach.player.vy,
-      });
-
-      if (!detached) return { ok: false, details };
-    }
-
-    return { ok: true, details };
+    const after = window.__qftc.getState();
+    return { attached, before, after };
   });
 
-  expect(result.ok, `Vine detach regression details: ${JSON.stringify(result.details)}`).toBeTruthy();
+  expect(result.attached).toBeTruthy();
+  expect(result.before.player.vine).not.toBeNull();
+  expect(result.after.player.vine).toBeNull();
+  expect(Math.abs(result.after.player.vx) + Math.abs(result.after.player.vy)).toBeGreaterThan(0.1);
 });

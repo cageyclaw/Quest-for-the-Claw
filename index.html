@@ -149,6 +149,7 @@ const SCRS=[
 ];
 
 const botQuery=new URLSearchParams(location.search).get('bot')==='1';
+const testMode=!!window.__QFTC_TEST__;
 if(window.__QFTC_BOT__||botQuery)botEnabled=true;
 
 if(botEnabled){gameState='PLAYING';reset();}
@@ -519,7 +520,7 @@ victory:gameState==='VICTORY',
 gameOver:gameState==='GAMEOVER',
 player:{x:pl.x,y:pl.y,vx:pl.vx,vy:pl.vy,gnd:pl.gnd,vine:pl.vine}
 }),
-setInput:(state)=>{manualInput={...manualInput,...state};},
+setInput:(state)=>{manualInput={...manualInput,...state};if(state.Space)jumpRequest=true;},
 step:(dt=16.67)=>{
 const steps=Math.max(1,Math.round(dt/16.67));
 for(let i=0;i<steps;i++)update();
@@ -527,23 +528,32 @@ draw();
 },
 enableBot:(on=true)=>{botEnabled=on;if(on){gameState='PLAYING';reset();}},
 setSeed:(seed)=>{rngSeed=seed>>>0;},
-getScreenMeta:()=>SCRS.map(s=>s.meta),
-attachToVineForTest:(screenIndex=1,vineIndex=0)=>{
-const screen=SCRS[screenIndex];
-if(!screen||!screen.v||!screen.v[vineIndex])return false;
-const v=screen.v[vineIndex];
-curScr=screenIndex;
-gameState='PLAYING';
-const ang=v.angle??v.a??0;
-const vx=v.x+Math.sin(ang)*v.l;
-const vy=v.y+Math.cos(ang)*v.l;
-pl.vine=vineIndex;
-pl.x=vx-pl.w/2;
-pl.y=vy;
-pl.vx=0;pl.vy=0;pl.gnd=false;
-return true;
-}
+getScreenMeta:()=>SCRS.map(s=>s.meta)
 };
+if(testMode){
+  window.__qftc._forceAttachVine=(index=0)=>{
+    let s=SCRS[curScr];
+    let vines=s.v||[];
+    if(!vines.length){
+      const found=SCRS.findIndex(sc=>sc.v&&sc.v.length);
+      if(found===-1)return false;
+      curScr=found;
+      s=SCRS[curScr];
+      vines=s.v||[];
+    }
+    const i=Math.max(0,Math.min(index,vines.length-1));
+    const v=vines[i];
+    const ang=v.angle!=null?v.angle:(v.a!=null?v.a:(v.base||0));
+    const vx=v.x+Math.sin(ang)*v.l;
+    const vy=v.y+Math.cos(ang)*v.l;
+    pl.vine=i;
+    pl.x=vx-pl.w/2;
+    pl.y=vy;
+    pl.vx=0;pl.vy=0;pl.gnd=false;
+    return true;
+  };
+}
+
 window.__qftc.tick=window.__qftc.step;
 
 reset();
