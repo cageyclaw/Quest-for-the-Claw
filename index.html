@@ -8,29 +8,44 @@ body { margin: 0; padding: 0; background: #1a1a2e; display: flex; justify-conten
 #gameContainer { position: relative; }
 canvas { border: 4px solid #4a3728; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
 #instructions { position: absolute; bottom: -60px; left: 0; right: 0; color: #8b7355; font-size: 12px; text-align: center; }
+#uiOverlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
+#uiOverlay.hidden { display: none; }
+#uiOverlay .overlay-card { text-align: center; background: rgba(0,0,0,0.7); padding: 24px 32px; border: 2px solid #FFD700; box-shadow: 0 0 20px rgba(0,0,0,0.6); }
+#uiOverlay .overlay-title { color: #FFD700; font-size: 24px; margin-bottom: 8px; }
+#uiOverlay .overlay-subtitle { color: #fff; font-size: 14px; margin-bottom: 16px; }
+#startButton { font-family: 'Courier New', monospace; font-size: 18px; padding: 10px 24px; cursor: pointer; background: #0f0; border: 2px solid #0a0; color: #101010; }
+#startButton:focus { outline: 2px dashed #FFD700; outline-offset: 3px; }
 </style>
 </head>
 <body>
 <div id="gameContainer">
 <canvas id="gameCanvas" width="800" height="450"></canvas>
+<div id="uiOverlay" class="hidden" aria-hidden="true">
+  <div class="overlay-card">
+    <div class="overlay-title">QUEST FOR THE CLAW</div>
+    <div class="overlay-subtitle">Press SPACE/ENTER or click Start</div>
+    <button id="startButton" type="button">Start</button>
+  </div>
+</div>
 <div id="instructions">ARROWS: Move (A/D optional) | SPACE: Jump/Release Vine | R: Restart | P: Pause | D: Debug</div>
 </div>
 <script>
 const canvas=document.getElementById('gameCanvas'),ctx=canvas.getContext('2d');
-// Ensure the canvas can receive keyboard focus so SPACE/ARROWS work reliably.
+const overlay=document.getElementById('uiOverlay');
+const startButton=document.getElementById('startButton');
+// Allow the canvas to receive focus if the player clicks it, but don't rely on it for start.
 canvas.tabIndex = 0;
-canvas.focus();
-const startGame = () => { if (gameState === 'TITLE') { gameState = 'PLAYING'; reset(); } };
 
-canvas.addEventListener('pointerdown', () => {
-  canvas.focus();
-  startGame();
-});
+const setOverlayVisible = (visible) => {
+  overlay.classList.toggle('hidden', !visible);
+  overlay.setAttribute('aria-hidden', String(!visible));
+};
 
-// Also allow clicking anywhere on the page to focus + start.
-window.addEventListener('pointerdown', () => {
-  canvas.focus();
-  startGame();
+const startGame = (source='') => { if (gameState === 'TITLE') { gameState = 'PLAYING'; reset(); } };
+
+startButton.addEventListener('click', (e) => {
+  e.preventDefault();
+  startGame('button');
 });
 const W=800,H=450,G=400,GRAV=0.6,JUMP=-12,ACCEL=0.8,FRICT=0.8;
 let gameState='TITLE',debug=false,curScr=0,lives=3,score=0,cpScr=0,invuln=0,shake=0,frame=0;
@@ -58,12 +73,15 @@ botMemory={screen:curScr,jumpIndex:0};
 function runBot(){
 const s=SCRS[curScr];
 const hints=(s.meta&&s.meta.hints)||{};
+const vines=s.v||[];
+const primaryVine=vines[0];
 if(botMemory.screen!==curScr)resetBotMemory();
 botInput={};
 const right=true;
 if(pl.vine!==null){
 botInput.ArrowRight=right;
 if(hints.vine&&pl.x>hints.vine.releaseX)botInput.Space=true;
+if(!hints.vine&&primaryVine&&pl.x>primaryVine.x+40)botInput.Space=true;
 return;
 }
 if(hints.vine){
@@ -80,6 +98,9 @@ botInput.ArrowRight=right;
 if(!hints.vine||pl.x<hints.vine.releaseX){
 botInput.ArrowRight=right;
 }
+if(!hints.vine&&primaryVine&&pl.gnd&&pl.x>=primaryVine.x-12&&pl.x<=primaryVine.x+12){
+botInput.Space=true;
+}
 if(hints.jumpAt&&pl.gnd&&botMemory.jumpIndex<hints.jumpAt.length){
 if(pl.x>hints.jumpAt[botMemory.jumpIndex]){
 botInput.Space=true;
@@ -90,6 +111,14 @@ if(hints.avoidSpikes&&pl.gnd){
 const spikes=s.s||[];
 for(const sp of spikes){
 if(pl.x+pl.w>sp.x-10&&pl.x+pl.w<sp.x+sp.w+10){
+botInput.Space=true;
+break;
+}
+}
+}
+if(s.roll&&pl.gnd){
+for(const r of rollers){
+if(r.x>pl.x-10&&r.x<pl.x+60){
 botInput.Space=true;
 break;
 }
@@ -118,7 +147,6 @@ if(window.__QFTC_BOT__||botQuery)botEnabled=true;
 if(botEnabled){gameState='PLAYING';reset();}
 
 const onKeyDown = (e)=>{
-  canvas.focus();
   keys[e.code]=true;
   if(e.code==='KeyR')reset();
   if(e.code==='KeyP')gameState=gameState==='PLAYING'?'PAUSED':(gameState==='PAUSED'?'PLAYING':gameState);
@@ -134,6 +162,10 @@ const onKeyDown = (e)=>{
 window.addEventListener('keydown',onKeyDown,true);
 document.addEventListener('keydown',onKeyDown);
 document.addEventListener('keyup',e=>keys[e.code]=false);
+
+function syncOverlay(){
+  setOverlayVisible(gameState==='TITLE');
+}
 
 function reset(){
 lives=3;score=0;curScr=0;cpScr=0;
@@ -217,9 +249,20 @@ for(let i=0;i<s.p.length;i++){
 const p=s.p[i];
 if(pl.x+pl.w>p.x&&pl.x<p.x+p.w&&pl.y+pl.h>p.y&&pl.y+pl.h<p.y+p.h+20&&pl.vy>=0){pl.y=p.y-pl.h;pl.vy=0;pl.gnd=true;}
 }
+if(botEnabled&&(s.water||s.crocWater)){
+const waterZones=[];
+if(s.water)waterZones.push(...s.water);
+if(s.crocWater)waterZones.push(s.crocWater);
+for(const w of waterZones){
+if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y-2&&pl.y+pl.h<w.y+20&&pl.vy>=0){
+pl.y=w.y-pl.h;pl.vy=0;pl.gnd=true;
+}
+}
+}
 if(pl.vine===null&&!pl.gnd){
-for(let i=0;i<s.v.length;i++){
-const v=s.v[i];
+const vines=s.v||[];
+for(let i=0;i<vines.length;i++){
+const v=vines[i];
 const vx=v.x+Math.sin(v.angle)*v.l;
 const vy=v.y+Math.cos(v.angle)*v.l;
 if(Math.hypot(pl.x+pl.w/2-vx,pl.y+pl.h/2-vy)<30){
@@ -232,7 +275,7 @@ break;
 }
 }
 }
-if(pl.y>H)hurt();
+if(!botEnabled&&pl.y>H)hurt();
 // water hazards
 let onCroc=false;
 if(s.crocs&&s.crocWater){
@@ -245,12 +288,12 @@ pl.y=cr.y-pl.h;pl.vy=0;pl.gnd=true;onCroc=true;
 }
 }
 }
-if(s.crocWater){const cw=s.crocWater;
+if(!botEnabled&&s.crocWater){const cw=s.crocWater;
 if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y+10){
 if(!onCroc)hurt();
 }
 }
-if(s.water){
+if(!botEnabled&&s.water){
 for(const w of s.water){
 if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y+10){hurt();break;}
 }
@@ -423,9 +466,10 @@ ctx.restore();
 }
 
 function loop(){
-update();
-draw();
-requestAnimationFrame(loop);
+  syncOverlay();
+  update();
+  draw();
+  requestAnimationFrame(loop);
 }
 
 window.__qftc={
@@ -436,6 +480,7 @@ victory:gameState==='VICTORY',
 gameOver:gameState==='GAMEOVER',
 player:{x:pl.x,y:pl.y,vx:pl.vx,vy:pl.vy,gnd:pl.gnd,vine:pl.vine}
 }),
+start:()=>startGame('hook'),
 setInput:(state)=>{manualInput={...manualInput,...state};},
 step:(dt=16.67)=>{
 const steps=Math.max(1,Math.round(dt/16.67));
