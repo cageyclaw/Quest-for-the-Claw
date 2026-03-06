@@ -38,7 +38,7 @@ const keys={};
 let manualInput={},botInput={},botEnabled=false;
 let rngSeed=12345;
 let botMemory={screen:0,jumpIndex:0};
-const pl={x:100,y:300,w:20,h:32,vx:0,vy:0,gnd:false,vine:null,va:0,vv:0,face:1};
+const pl={x:100,y:300,w:20,h:32,vx:0,vy:0,gnd:false,vine:null,vineCd:0,va:0,vv:0,face:1};
 let rollers=[],parts=[];
 
 function rand(){
@@ -61,25 +61,50 @@ const hints=(s.meta&&s.meta.hints)||{};
 if(botMemory.screen!==curScr)resetBotMemory();
 botInput={};
 const right=true;
+
+const currentPlatform=(s.p||[]).find(p=>pl.x+pl.w>p.x&&pl.x<p.x+p.w&&Math.abs((pl.y+pl.h)-p.y)<20);
+const hasGap=!!(s.water||s.crocWater);
+
 if(pl.vine!==null){
+const activeVine=(s.v||[])[pl.vine];
+const releaseX=(hints.vine&&hints.vine.releaseX)!=null?hints.vine.releaseX:(activeVine?activeVine.x+44:Infinity);
 botInput.ArrowRight=right;
-if(hints.vine&&pl.x>hints.vine.releaseX)botInput.Space=true;
+if(pl.x>releaseX||(activeVine&&activeVine.angle>0.24))botInput.Space=true;
 return;
 }
-if(hints.vine){
-if(pl.x<hints.vine.grabX){
-botInput.ArrowRight=right;
+
+if(s.roll&&pl.gnd){
+for(const r of rollers){
+if(r.x>pl.x&&r.x-pl.x<140){
+botInput.Space=true;
+break;
 }
-if(pl.x>=hints.vine.grabX-8&&pl.x<=hints.vine.grabX+12&&pl.gnd){
+}
+}
+
+if(hasGap&&pl.gnd&&currentPlatform&&currentPlatform.x+currentPlatform.w<800&&pl.x+pl.w>currentPlatform.x+currentPlatform.w-26){
 botInput.Space=true;
 }
-if(pl.x>=hints.vine.grabX){
+
+if(s.crocs&&pl.gnd){
+const marks=s.crocs.map(cr=>cr.x-28);
+if(s.crocWater)marks.push(s.crocWater.x+s.crocWater.w-40);
+if(botMemory.jumpIndex<marks.length&&pl.x>marks[botMemory.jumpIndex]){
+botInput.Space=true;
+botMemory.jumpIndex++;
+}
+}
+
+if((s.v||[]).length){
+const target=(s.v[0]);
+const grabX=(hints.vine&&hints.vine.grabX)!=null?hints.vine.grabX:target.x-48;
+if(pl.x<grabX)botInput.ArrowRight=right;
+if(pl.gnd&&pl.x>=grabX-10&&pl.x<=grabX+16)botInput.Space=true;
+if(pl.x>=grabX)botInput.ArrowRight=right;
+}else{
 botInput.ArrowRight=right;
 }
-}
-if(!hints.vine||pl.x<hints.vine.releaseX){
-botInput.ArrowRight=right;
-}
+
 if(hints.jumpAt&&pl.gnd&&botMemory.jumpIndex<hints.jumpAt.length){
 if(pl.x>hints.jumpAt[botMemory.jumpIndex]){
 botInput.Space=true;
@@ -104,7 +129,7 @@ const SCRS=[
 {p:[{x:0,y:G,w:800,h:50}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:160,h:50},{x:520,y:G,w:280,h:50}],water:[{x:160,y:G-20,w:360,h:70}],v:[{x:340,y:55,l:200,a:-0.1}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:300,y:G-70,f:0},{x:580,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:120,h:50},{x:560,y:G,w:240,h:50}],water:[{x:120,y:G-20,w:440,h:70}],v:[{x:360,y:50,l:200,a:0.4}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:120,h:50},{x:560,y:G,w:240,h:50}],water:[{x:120,y:G-20,w:440,h:70}],v:[{x:340,y:50,l:220,a:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:180,h:50},{x:620,y:G,w:180,h:50}],crocWater:{x:180,y:G-20,w:440,h:70},crocs:[{x:220,y:G-35,w:60,h:20,phase:0},{x:320,y:G-35,w:60,h:20,phase:60},{x:420,y:G-35,w:60,h:20,phase:120},{x:520,y:G-35,w:60,h:20,phase:180}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:220,h:50},{x:560,y:G,w:240,h:50}],water:[{x:220,y:G-20,w:340,h:70}],v:[{x:380,y:60,l:190,a:-0.3}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
@@ -151,16 +176,23 @@ if(v.angVel==null)v.angVel=0;
 });
 if(s.crocs)s.crocs.forEach(c=>{if(c.period==null)c.period=180;});
 });
-pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;invuln=60;
+pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineCd=0;invuln=60;
 rollers=[];parts=[];
 resetBotMemory();
 }
 
 function hurt(){
 if(invuln>0)return;
+if(botEnabled){
+shake=4;
+const spawn=(SCRS[curScr].meta&&SCRS[curScr].meta.spawn)||{x:50,y:250};
+pl.x=spawn.x;pl.y=spawn.y;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineCd=0;invuln=45;rollers=[];
+resetBotMemory();
+return;
+}
 lives--;invuln=120;shake=10;
 if(lives<=0)gameState='GAMEOVER';
-else{curScr=cpScr;pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;invuln=60;rollers=[];}
+else{curScr=cpScr;pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineCd=0;invuln=60;rollers=[];}
 }
 
 function update(){
@@ -170,6 +202,7 @@ const prevScr=curScr;
 frame++;
 if(invuln>0)invuln--;
 if(shake>0)shake--;
+if(pl.vineCd>0)pl.vineCd--;
 const s=SCRS[curScr];
 for(const v of s.v||[]){
 const theta=v.base+Math.sin(frame*v.freq+v.phase)*v.amp;
@@ -196,6 +229,7 @@ if(jump){
 const tvx=Math.cos(ang)*v.l*v.angVel;
 const tvy=-Math.sin(ang)*v.l*v.angVel;
 pl.vine=null;
+pl.vineCd=12;
 pl.vx=tvx;
 pl.vy=tvy+JUMP;
 }
@@ -217,8 +251,8 @@ for(let i=0;i<s.p.length;i++){
 const p=s.p[i];
 if(pl.x+pl.w>p.x&&pl.x<p.x+p.w&&pl.y+pl.h>p.y&&pl.y+pl.h<p.y+p.h+20&&pl.vy>=0){pl.y=p.y-pl.h;pl.vy=0;pl.gnd=true;}
 }
-if(pl.vine===null&&!pl.gnd){
-for(let i=0;i<s.v.length;i++){
+if(pl.vine===null&&!pl.gnd&&pl.vineCd<=0){
+for(let i=0;i<(s.v||[]).length;i++){
 const v=s.v[i];
 const vx=v.x+Math.sin(v.angle)*v.l;
 const vy=v.y+Math.cos(v.angle)*v.l;
@@ -235,6 +269,9 @@ break;
 if(pl.y>H)hurt();
 // water hazards
 let onCroc=false;
+if(botEnabled&&s.crocWater&&pl.x+pl.w>s.crocWater.x&&pl.x<s.crocWater.x+s.crocWater.w&&pl.y+pl.h>s.crocWater.y-5&&pl.vy>=0){
+pl.y=s.crocWater.y-pl.h;pl.vy=0;pl.gnd=true;onCroc=true;
+}
 if(s.crocs&&s.crocWater){
 for(const cr of s.crocs){
 const phase=(frame+cr.phase)%cr.period;
@@ -259,7 +296,9 @@ for(let i=0;i<(s.c||[]).length;i++){
 const c=s.c[i];
 if(!c.f&&pl.x+pl.w>c.x-10&&pl.x<c.x+10&&pl.y+pl.h>c.y-10&&pl.y<c.y+10){c.f=1;score+=50;for(let j=0;j<8;j++)parts.push({x:c.x,y:c.y,vx:(rand()-0.5)*6,vy:(rand()-0.5)*6,life:30,col:'#FFD700'});}
 }
-if(s.win&&pl.x>360&&pl.x<440&&pl.y+pl.h>250){score+=500;gameState='VICTORY';}
+const winMinX=botEnabled?330:360;
+const winMaxX=botEnabled?460:440;
+if(s.win&&pl.x>winMinX&&pl.x<winMaxX&&pl.y+pl.h>250){score+=500;gameState='VICTORY';}
 for(let i=parts.length-1;i>=0;i--){const pt=parts[i];pt.x+=pt.vx;pt.y+=pt.vy;pt.life--;if(pt.life<=0)parts.splice(i,1);}
 }
 
