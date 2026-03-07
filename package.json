@@ -1,0 +1,12 @@
+{
+  "name": "quest-for-the-claw-playtest",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:play": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.43.1"
+  }
+}
