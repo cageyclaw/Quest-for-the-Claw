@@ -38,7 +38,7 @@ test('start overlay does not consume Space after entering PLAYING', async ({ pag
   expect(stateDuringJump.player.gnd).toBeFalsy();
 });
 
-test('space detaches from vine after auto-grab', async ({ page }) => {
+test('space immediately detaches from vine and applies detach cooldown', async ({ page }) => {
   await loadGame(page, { testMode: true });
 
   await page.waitForFunction(() => !!window.__qftc._forceAttachVine);
@@ -51,18 +51,25 @@ test('space detaches from vine after auto-grab', async ({ page }) => {
     const before = window.__qftc.getState();
 
     window.__qftc.setInput({ Space: true });
-    for (let i = 0; i < 5; i++) window.__qftc.step(16.67);
-    const mid = window.__qftc.getState();
     window.__qftc.step(16.67);
+    const detached = window.__qftc.getState();
+
+    // Keep player near vine tip while holding space to ensure no instant re-grab.
+    const anchor = { ...detached.player };
+    for (let i = 0; i < 3; i++) {
+      window.__qftc.step(16.67);
+    }
+    const cooldownWindow = window.__qftc.getState();
+
     window.__qftc.setInput({ Space: false });
 
-    const after = window.__qftc.getState();
-    return { attached, before, mid, after };
+    return { attached, before, detached, cooldownWindow, anchor };
   });
 
   expect(result.attached).toBeTruthy();
   expect(result.before.player.vine).not.toBeNull();
-  expect(result.mid.player.vine).not.toBeNull();
-  expect(result.after.player.vine).toBeNull();
-  expect(Math.abs(result.after.player.vx) + Math.abs(result.after.player.vy)).toBeGreaterThan(0.1);
+  expect(result.detached.player.vine).toBeNull();
+  expect(result.detached.player.detachCooldownFrames).toBeGreaterThan(0);
+  expect(Math.abs(result.detached.player.vx) + Math.abs(result.detached.player.vy)).toBeGreaterThan(0.1);
+  expect(result.cooldownWindow.player.vine).toBeNull();
 });

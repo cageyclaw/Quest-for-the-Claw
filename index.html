@@ -33,14 +33,14 @@ window.addEventListener('pointerdown', () => {
   startGame();
 });
 const W=800,H=450,G=400,GRAV=0.6,JUMP=-12,ACCEL=0.8,FRICT=0.8;
-const VINE_DETACH_HOLD_GRACE_FRAMES=6;
+const VINE_DETACH_COOLDOWN_FRAMES=8;
 let gameState='TITLE',debug=false,curScr=0,lives=3,score=0,cpScr=0,invuln=0,shake=0,frame=0;
 const keys={};
 let jumpRequest=false;
 let manualInput={},botInput={},botEnabled=false;
 let rngSeed=12345;
 let botMemory={screen:0,jumpIndex:0};
-const pl={x:100,y:300,w:20,h:32,vx:0,vy:0,gnd:false,vine:null,vineGraceFrames:0,va:0,vv:0,face:1};
+const pl={x:100,y:300,w:20,h:32,vx:0,vy:0,gnd:false,vine:null,detachCooldownFrames:0,va:0,vv:0,face:1};
 let rollers=[],parts=[];
 
 function rand(){
@@ -64,7 +64,7 @@ const ang=v.angle;
 const tvx=Math.cos(ang)*v.l*v.angVel;
 const tvy=-Math.sin(ang)*v.l*v.angVel;
 pl.vine=null;
-pl.vineGraceFrames=0;
+pl.detachCooldownFrames=VINE_DETACH_COOLDOWN_FRAMES;
 pl.vx=tvx;
 pl.vy=tvy+JUMP;
 }
@@ -191,7 +191,7 @@ if(v.angVel==null)v.angVel=0;
 });
 if(s.crocs)s.crocs.forEach(c=>{if(c.period==null)c.period=180;});
 });
-pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineGraceFrames=0;invuln=60;
+pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.detachCooldownFrames=0;invuln=60;
 rollers=[];parts=[];
 resetBotMemory();
 }
@@ -200,7 +200,7 @@ function hurt(){
 if(invuln>0)return;
 lives--;invuln=120;shake=10;
 if(lives<=0)gameState='GAMEOVER';
-else{curScr=cpScr;pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.vineGraceFrames=0;invuln=60;rollers=[];}
+else{curScr=cpScr;pl.x=50;pl.y=250;pl.vx=0;pl.vy=0;pl.vine=null;pl.detachCooldownFrames=0;invuln=60;rollers=[];}
 }
 
 function update(){
@@ -210,6 +210,7 @@ const prevScr=curScr;
 frame++;
 if(invuln>0)invuln--;
 if(shake>0)shake--;
+if(pl.detachCooldownFrames>0)pl.detachCooldownFrames--;
 const s=SCRS[curScr];
 for(const v of s.v||[]){
 const theta=v.base+Math.sin(frame*v.freq+v.phase)*v.amp;
@@ -233,8 +234,7 @@ const ang=v.angle;
 pl.x=v.x+Math.sin(ang)*v.l-pl.w/2;
 pl.y=v.y+Math.cos(ang)*v.l;
 pl.vx=0;pl.vy=0;pl.gnd=false;
-if(pl.vineGraceFrames>0)pl.vineGraceFrames--;
-if((jumpPressed||jump)&&pl.vineGraceFrames<=0){
+if(jumpPressed||jump){
 detachFromVine(v);
 }
 return;
@@ -260,7 +260,7 @@ for(let i=0;i<s.p.length;i++){
 const p=s.p[i];
 if(pl.x+pl.w>p.x&&pl.x<p.x+p.w&&pl.y+pl.h>p.y&&pl.y+pl.h<p.y+p.h+20&&pl.vy>=0){pl.y=p.y-pl.h;pl.vy=0;pl.gnd=true;}
 }
-if(pl.vine===null&&!pl.gnd){
+if(pl.vine===null&&pl.detachCooldownFrames<=0){
 const vines=s.v||[];
 for(let i=0;i<vines.length;i++){
 const v=vines[i];
@@ -268,7 +268,6 @@ const vx=v.x+Math.sin(v.angle)*v.l;
 const vy=v.y+Math.cos(v.angle)*v.l;
 if(Math.hypot(pl.x+pl.w/2-vx,pl.y+pl.h/2-vy)<30){
 pl.vine=i;
-pl.vineGraceFrames=VINE_DETACH_HOLD_GRACE_FRAMES;
 pl.x=vx-pl.w/2;
 pl.y=vy;
 pl.vx=0;pl.vy=0;
@@ -469,15 +468,9 @@ if(debug){
 ctx.fillStyle='#0f0';
 ctx.fillText('FPS:'+Math.round(60),10,40);
 ctx.fillText('POS:'+Math.round(pl.x)+','+Math.round(pl.y),10,60);
-ctx.fillText('VINE:'+(pl.vine!==null?'YES':'NO'),10,80);
+ctx.fillText('VINE ATTACHED:'+(pl.vine!==null?'YES':'NO'),10,80);
+ctx.fillText('VINE DETACH CD:'+pl.detachCooldownFrames,10,100);
 ctx.strokeStyle='#0f0';ctx.strokeRect(pl.x,pl.y,pl.w,pl.h);
-}
-if(gameState==='PLAYING'&&pl.vine!==null){
-const msg='SPACE to jump off vine';
-ctx.fillStyle='#fff';
-ctx.font='14px monospace';
-const msgW=ctx.measureText(msg).width;
-ctx.fillText(msg,(W-msgW)/2,430);
 }
 if(gameState==='TITLE'){
 ctx.fillStyle='rgba(0,0,0,0.7)';ctx.fillRect(0,0,W,H);
@@ -529,7 +522,7 @@ score,lives,frame,gameState,
 screenIndex:curScr,
 victory:gameState==='VICTORY',
 gameOver:gameState==='GAMEOVER',
-player:{x:pl.x,y:pl.y,vx:pl.vx,vy:pl.vy,gnd:pl.gnd,vine:pl.vine,attached:pl.vine!==null}
+player:{x:pl.x,y:pl.y,vx:pl.vx,vy:pl.vy,gnd:pl.gnd,vine:pl.vine,attached:pl.vine!==null,detachCooldownFrames:pl.detachCooldownFrames}
 }),
 setInput:(state)=>{manualInput={...manualInput,...state};if(state.Space)jumpRequest=true;},
 step:(dt=16.67)=>{
@@ -558,7 +551,7 @@ if(testMode){
     const vx=v.x+Math.sin(ang)*v.l;
     const vy=v.y+Math.cos(ang)*v.l;
     pl.vine=i;
-    pl.vineGraceFrames=VINE_DETACH_HOLD_GRACE_FRAMES;
+    pl.detachCooldownFrames=0;
     pl.x=vx-pl.w/2;
     pl.y=vy;
     pl.vx=0;pl.vy=0;pl.gnd=false;
