@@ -143,7 +143,7 @@ const SCRS=[
 {p:[{x:0,y:G,w:160,h:50},{x:520,y:G,w:280,h:50}],water:[{x:160,y:G,w:360,h:70}],v:[{x:340,y:55,l:200,a:-0.1}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:300,y:G-70,f:0},{x:580,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:120,h:50},{x:560,y:G,w:240,h:50}],water:[{x:120,y:G,w:440,h:70}],v:[{x:360,y:50,l:200,a:0.4}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
-{p:[{x:0,y:G,w:180,h:50},{x:620,y:G,w:180,h:50}],crocWater:{x:180,y:G,w:440,h:70},crocs:[{x:220,y:G-35,w:60,h:20,phase:0},{x:320,y:G-35,w:60,h:20,phase:60},{x:420,y:G-35,w:60,h:20,phase:120},{x:520,y:G-35,w:60,h:20,phase:180}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
+{p:[{x:0,y:G,w:180,h:50},{x:620,y:G,w:180,h:50}],crocWater:{x:180,y:G,w:440,h:70},crocs:[{x:220,y:G-35,w:60,h:20,phase:0,sleeping:true},{x:320,y:G-35,w:60,h:20,phase:60,sleeping:true},{x:420,y:G-35,w:60,h:20,phase:120,sleeping:true},{x:520,y:G-35,w:60,h:20,phase:180,sleeping:true}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:220,h:50},{x:560,y:G,w:240,h:50}],water:[{x:220,y:G,w:340,h:70}],v:[{x:380,y:60,l:190,a:-0.3}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
 {p:[{x:0,y:G,w:800,h:50}],roll:1,c:[{x:160,y:G-70,f:0},{x:680,y:G-70,f:0}],meta:{spawn:{x:50,y:250},exit:{x:760,y:0,w:40,h:450}}},
@@ -151,6 +151,9 @@ const SCRS=[
 ];
 
 const botQuery=new URLSearchParams(location.search).get('bot')==='1';
+const easyQuery=new URLSearchParams(location.search).get('easy')==='1';
+const CROCS_ALWAYS_CLOSED=true;
+const crocsAlwaysClosed=CROCS_ALWAYS_CLOSED||easyQuery;
 const testMode=!!window.__QFTC_TEST__;
 if(window.__QFTC_BOT__||botQuery)botEnabled=true;
 
@@ -282,7 +285,7 @@ let onCroc=false;
 if(s.crocs&&s.crocWater){
 for(const cr of s.crocs){
 const phase=(frame+cr.phase)%cr.period;
-const closed=phase<cr.period*0.45;
+const closed=crocsAlwaysClosed||!!cr.sleeping||phase<cr.period*0.45;
 cr.closed=closed;
 if(closed&&pl.x+pl.w>cr.x&&pl.x<cr.x+cr.w&&pl.y+pl.h>cr.y-5&&pl.y+pl.h<cr.y+20&&pl.vy>=0){
 pl.y=cr.y-pl.h;pl.vy=0;pl.gnd=true;onCroc=true;
@@ -292,7 +295,7 @@ pl.y=cr.y-pl.h;pl.vy=0;pl.gnd=true;onCroc=true;
 if(botEnabled){
 if(s.crocWater){
 const cw=s.crocWater;
-if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y+10){
+if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y){
 pl.y=cw.y-pl.h;
 pl.vy=0;
 pl.gnd=true;
@@ -300,7 +303,7 @@ pl.gnd=true;
 }
 if(s.water){
 for(const w of s.water){
-if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y+10){
+if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y){
 pl.y=w.y-pl.h;
 pl.vy=0;
 pl.gnd=true;
@@ -310,13 +313,13 @@ break;
 }
 }
 if(s.crocWater){const cw=s.crocWater;
-if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y+10){
+if(pl.x+pl.w>cw.x&&pl.x<cw.x+cw.w&&pl.y+pl.h>cw.y){
 if(!onCroc&&!botEnabled)hurt();
 }
 }
 if(s.water){
 for(const w of s.water){
-if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y+10){if(!botEnabled)hurt();break;}
+if(pl.x+pl.w>w.x&&pl.x<w.x+w.w&&pl.y+pl.h>w.y){if(!botEnabled)hurt();break;}
 }
 }
 for(let i=0;i<(s.c||[]).length;i++){
@@ -532,9 +535,14 @@ draw();
 },
 enableBot:(on=true)=>{botEnabled=on;if(on){gameState='PLAYING';reset();}},
 setSeed:(seed)=>{rngSeed=seed>>>0;},
-getScreenMeta:()=>SCRS.map(s=>s.meta)
+getScreenMeta:()=>SCRS.map(s=>s.meta),
+getScreens:()=>JSON.parse(JSON.stringify(SCRS))
 };
 if(testMode){
+  window.__qftc._setScreen=(index=0)=>{curScr=Math.max(0,Math.min(index,SCRS.length-1));return curScr;};
+  window.__qftc._setPlayer=(state={})=>{if(state.x!=null)pl.x=state.x;if(state.y!=null)pl.y=state.y;if(state.vx!=null)pl.vx=state.vx;if(state.vy!=null)pl.vy=state.vy;if(state.gnd!=null)pl.gnd=!!state.gnd;};
+  window.__qftc._setInvuln=(frames=0)=>{invuln=Math.max(0,frames|0);};
+  window.__qftc._setGameState=(state='PLAYING')=>{gameState=state;};
   window.__qftc._forceAttachVine=(index=0)=>{
     let s=SCRS[curScr];
     let vines=s.v||[];
